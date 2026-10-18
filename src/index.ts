@@ -216,5 +216,5 @@ export type { HostModelBrokerV1, HostModelQuoteObservationV1, HostModelQuoteRequ
 export { confinedFetch, confinedFetchRequest } from "@atomicstrata/llmwiki-core";
 export type { FetchLimits, ConfinedFetchSeams, ConfinedFetchResult, ConfinedFetchRequest, ConfinedFetchMethod } from "@atomicstrata/llmwiki-core";
 export { scaffoldConfinedDirectories, ensureConfinedDirectory, type ScaffoldDirectoriesResultV1 } from "@atomicstrata/llmwiki-core";
-export { adaptSemanticaSnapshot, semanticaSnapshotDigest } from "./semantica-snapshot.js";
-export type { SemanticaEvidence, SemanticaPageInput, SemanticaRelation, SemanticaSnapshot, SemanticaAdapterResult, WikiPageInput } from "./semantica-snapshot.js";
+export { adaptSemanticaSnapshot, semanticaSnapshotDigest } from "@atomicstrata/llmwiki-core";
+export type { SemanticaEvidence, SemanticaPageInput, SemanticaRelation, SemanticaSnapshot, SemanticaAdapterResult, WikiPageInput } from "@atomicstrata/llmwiki-core";

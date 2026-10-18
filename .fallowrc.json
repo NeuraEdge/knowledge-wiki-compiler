@@ -1,6 +1,7 @@
 {
   "$schema": "https://fallow.tools/schema.json",
   "entry": [
+    "packages/semantica/src/index.ts",
     "scripts/check-fallow-report.mjs",
     "src/core-index.ts",
     "src/compiler-cli.ts",

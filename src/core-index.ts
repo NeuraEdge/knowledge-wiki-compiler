@@ -155,3 +155,5 @@ export type { HostModelBrokerV1, HostModelQuoteObservationV1, HostModelQuoteRequ
 export { confinedFetch, confinedFetchRequest } from "./connectors/confined-fetch.js";
 export type { FetchLimits, ConfinedFetchSeams, ConfinedFetchResult, ConfinedFetchRequest, ConfinedFetchMethod } from "./connectors/confined-fetch.js";
 export { scaffoldConfinedDirectories, ensureConfinedDirectory, type ScaffoldDirectoriesResultV1 } from "./utils/confined-scaffold.js";
+export { adaptSemanticaSnapshot, semanticaSnapshotDigest } from "./semantica-snapshot.js";
+export type { SemanticaEvidence, SemanticaPageInput, SemanticaRelation, SemanticaSnapshot, SemanticaAdapterResult, WikiPageInput } from "./semantica-snapshot.js";

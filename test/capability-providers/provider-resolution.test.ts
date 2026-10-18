@@ -109,6 +109,8 @@ describe("provider exact resolution", () => {
   it("refuses an installed pin whose immutable package bytes are absent", async () => {
     const fixture = await trackedFixture();
     const packageRoot = path.join(fixture.paths.packagesRoot, fixture.pin.packageDigest.slice(7));
+    // macOS requires the sealed directory to be writable before renaming it.
+    await chmod(packageRoot, 0o700);
     await rename(packageRoot, `${packageRoot}.missing`);
     const unknownCapability = { ...fixture.pin, capabilityId: parseCapabilityId("unknown") };
     await expect(resolveProviderPin(unknownCapability, fixture.context)).resolves.toMatchObject({

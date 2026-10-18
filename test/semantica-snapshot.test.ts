@@ -41,6 +41,8 @@ describe("Semantica snapshot adapter", () => {
   it("fails closed when evidence is missing and warns on dangling relations", () => {
     const snapshot = fixture();
     snapshot.relations.push({ fromEntityId: "entity-a", toEntityId: "gone", label: "old" });
+    const { digest: _originalDigest, ...withDanglingRelation } = snapshot;
+    snapshot.digest = semanticaSnapshotDigest(withDanglingRelation);
     expect(adaptSemanticaSnapshot(snapshot).warnings).toHaveLength(1);
     snapshot.pages[0].evidenceIds = ["missing"];
     const { digest: _digest, ...content } = snapshot;

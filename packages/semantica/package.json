@@ -1,0 +1,15 @@
+{
+  "name": "@neuraedge/knowledge-wiki-compiler-semantica",
+  "version": "0.1.0",
+  "description": "Semantica reading-report page compiler from NeuraEdge/knowledge-wiki-compiler",
+  "type": "module",
+  "license": "MIT",
+  "repository": "https://github.com/NeuraEdge/knowledge-wiki-compiler",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm --prefix ../.. test -- packages/semantica/tests"
+  },
+  "engines": { "node": ">=24" }
+}

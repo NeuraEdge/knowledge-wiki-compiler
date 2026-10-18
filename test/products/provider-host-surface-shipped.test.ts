@@ -88,6 +88,7 @@ const PUBLIC_RUNTIME_EXPORTS: Readonly<Record<string, string>> = {
   HumanInputValidationError: "function",
   HOST_DECLARED_CONTRACT_SET: "object",
   acquireMutationLockBlocking: "function",
+  adaptSemanticaSnapshot: "function",
   approveHumanGateInteractively: "function",
   artifactPaths: "function",
   assertCurrentWorkflowProcessAuthority: "function",
@@ -176,6 +177,7 @@ const PUBLIC_RUNTIME_EXPORTS: Readonly<Record<string, string>> = {
   runPreparation: "function",
   scanPreparationInventory: "function",
   scaffoldConfinedDirectories: "function",
+  semanticaSnapshotDigest: "function",
   slugify: "function",
 };
 

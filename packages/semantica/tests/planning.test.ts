@@ -6,6 +6,42 @@ const sources = [{ id: 'a', title: 'Report', passages: [] }];
 const page = { id: 'energy', title: 'Energy', type: 'topic', summary: 'Energy management',
   sourceIds: ['a'], query: 'energy', relatedIds: [] };
 
+it('corrects malformed discovery for only the affected source before planning', async () => {
+  const complete = vi.fn().mockResolvedValueOnce('{"concepts":[{"concept":"unfinished')
+    .mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify({ pages: [page] }));
+  expect(await planHostedWiki({ sources, complete, retrieve: vi.fn(), maxInputChars: 32000 })).toEqual([page]);
+  expect(complete.mock.calls.map(([request]) => request.stage)).toEqual(['discovery', 'discovery', 'planning']);
+  expect(complete.mock.calls[1][0].user).toContain('valid JSON');
+});
+
+it('rejects persistently malformed discovery after one correction', async () => {
+  const complete = vi.fn().mockResolvedValue('{broken');
+  await expect(planHostedWiki({ sources, complete, retrieve: vi.fn(), maxInputChars: 32000 }))
+    .rejects.toThrow('Wiki discovery: response must be valid JSON');
+  expect(complete).toHaveBeenCalledTimes(2);
+});
+
+it('does not retry discovery provider failures as invalid output', async () => {
+  const complete = vi.fn().mockRejectedValue(new Error('provider offline'));
+  await expect(planHostedWiki({ sources, complete, retrieve: vi.fn(), maxInputChars: 32000 }))
+    .rejects.toThrow('provider offline');
+  expect(complete).toHaveBeenCalledTimes(1);
+});
+
+it('rejects schema-invalid discovery after one correction', async () => {
+  const complete = vi.fn().mockResolvedValue('{"concepts":[{"concept":"missing required fields"}]}');
+  await expect(planHostedWiki({ sources, complete, retrieve: vi.fn(), maxInputChars: 32000 }))
+    .rejects.toThrow('Wiki discovery: response must match the extract_concepts schema');
+  expect(complete).toHaveBeenCalledTimes(2);
+});
+
+it('does not enlarge the source discovery budget for a correction', async () => {
+  const complete = vi.fn().mockResolvedValue('x'.repeat(32000));
+  await expect(planHostedWiki({ sources, complete, retrieve: vi.fn(), maxInputChars: 32000 }))
+    .rejects.toThrow(/budget/);
+  expect(complete).toHaveBeenCalledTimes(1);
+});
+
 it('repairs a rejected plan once without repeating source discovery', async () => {
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}')
     .mockResolvedValueOnce(JSON.stringify({ pages: [{ ...page, relatedIds: ['absent'] }] }))

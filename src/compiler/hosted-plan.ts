@@ -31,20 +31,35 @@ export async function hostedCompletion(input: HostedCompileInput, request: Param
 
 /** Parse structured model output without accepting prose as a successful plan. */
 function structuredOutput(raw: string): unknown {
-  return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/u, '').replace(/\s*```$/u, ''));
+  try { return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/u, '').replace(/\s*```$/u, '')); }
+  catch { throw new Error('Wiki discovery: response must be valid JSON'); }
+}
+
+/** A correction must satisfy the same extraction contract as the first response. */
+function discoveryConcepts(raw: string) {
+  const concepts = parseConceptExtraction(JSON.stringify(structuredOutput(raw)));
+  if (!concepts) throw new Error('Wiki discovery: response must match the extract_concepts schema');
+  return concepts;
 }
 
 /** Source discovery is organization, not a second fact or entity extractor. */
 async function discover(input: HostedCompileInput, source: HostedSource) {
   const preview = sourcePreview(source, Math.min(16000, Math.floor(input.maxInputChars / 2)));
   const system = buildExtractionPrompt(`Source: ${source.title}\nThis is a bounded structure preview, not the complete document.\n${preview}`, '');
-  const raw = await hostedCompletion(input, { system, stage: 'discovery', user: [
+  const user = [
     'This hosted transport has no tools. Return the extract_concepts input as JSON only, matching this schema:',
     JSON.stringify(CONCEPT_EXTRACTION_TOOL.input_schema),
     'There is no existing wiki index. These are candidate reading concepts, not verified findings.',
-  ].join('\n') });
-  const concepts = parseConceptExtraction(JSON.stringify(structuredOutput(raw)));
-  if (!concepts) throw new Error('Invalid wiki concept discovery');
+  ].join('\n');
+  const raw = await hostedCompletion(input, { system, stage: 'discovery', user });
+  let concepts;
+  try { concepts = discoveryConcepts(raw); }
+  catch (error) {
+    const correction = await hostedCompletion(input, { system, stage: 'discovery',
+      user: JSON.stringify({ contract: user, rejectedResponse: raw, validationError: (error as Error).message,
+        instruction: 'Correct this source discovery. Return the complete extract_concepts input as valid JSON only.' }) });
+    concepts = discoveryConcepts(correction);
+  }
   return concepts.map(concept => ({ title: concept.concept, summary: concept.summary, sourceTitle: source.title, sourceIds: [source.id] }));
 }
 

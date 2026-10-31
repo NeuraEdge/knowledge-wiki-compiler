@@ -1,6 +1,7 @@
 /** Hosted compilation must discover semantic pages, retrieve evidence, then synthesize. */
 import { expect, it, vi } from 'vitest';
 import { generateSemanticaWiki } from '../src/generation.js';
+import { CONCEPT_EXTRACTION_TOOL } from '../../../src/compiler/prompts.js';
 
 const sources = [{ id: 'a', title: 'Report A', passages: [{ text: 'Energy use fell.', sectionPath: ['Energy'] }] }];
 const evidence = [{ id: 'e', sourceId: 'a', quote: 'Energy use fell.', locator: { page: 4 } }];
@@ -13,6 +14,7 @@ it('runs native discovery, semantic planning, grounded writing and final overvie
   const retrieve = vi.fn(async () => evidence);
   const result = await generateSemanticaWiki({ sources, complete, retrieve, maxInputChars: 32000 });
   expect(complete).toHaveBeenCalledTimes(4);
+  expect(complete.mock.calls[0][0].user).toContain(JSON.stringify(CONCEPT_EXTRACTION_TOOL.input_schema));
   expect(retrieve).toHaveBeenCalledWith(expect.objectContaining({ query: 'energy management', sourceIds: ['a'] }));
   expect(result.reports.map(page => page.type)).toEqual(['overview', 'topic']);
   expect(result.reports[0].sections[0]).toMatchObject({ evidenceIds: ['e'] });

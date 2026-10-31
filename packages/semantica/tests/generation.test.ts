@@ -46,7 +46,7 @@ it.each(['Claim without a reference.', 'Claim. ^[e0.md:0-1]', 'Claim. ^[e0.md:1-
 
 it('refuses unauthorized contributors before retrieval or writing', async () => {
   const invalid = { pages: [{ ...plan.pages[0], sourceIds: ['other'] }] };
-  const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(invalid));
+  const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValue(JSON.stringify(invalid));
   const retrieve = vi.fn();
   await expect(generateSemanticaWiki({ sources, complete, retrieve, maxInputChars: 32000 })).rejects.toThrow(/scope/i);
   expect(retrieve).not.toHaveBeenCalled();

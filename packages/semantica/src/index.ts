@@ -1,8 +1,11 @@
 /**
  * Compile one adopted Semantica graph's reading reports into a navigable wiki.
- * This entry has no model, parser, filesystem or extraction dependency. Reports
- * and their identities remain Semantica-owned; slugs are presentation keys only.
+ * Hosted generation uses native compiler prompts and caller-owned model/retrieval
+ * execution. Canonical facts and evidence remain Semantica-owned.
  */
+export { generateSemanticaWiki, HOSTED_WIKI_RECIPE } from './generation.js';
+export type * from './generation.js';
+
 export interface SemanticaWikiReport {
   id: string;
   entityId?: string;
@@ -36,6 +39,7 @@ export interface SemanticaWikiPage {
   slug: string;
   title: string;
   body: string;
+  sections: SemanticaWikiReport['sections'];
   links: string[];
   pageType: string;
   provenanceState: 'extracted' | 'ambiguous';
@@ -63,6 +67,7 @@ function reportPage(input: SemanticaWikiInput, report: SemanticaWikiReport): Sem
   return {
     slug: reportSlug(report), title: report.title, pageType: report.type,
     body: report.sections.map(section => [section.title ? `## ${section.title}` : '', section.text].filter(Boolean).join('\n\n')).join('\n\n'),
+    sections: report.sections.map(section => ({ ...section })),
     links: [], provenanceState: 'extracted',
     metadata: { ...metadata(input, report.sections.flatMap(section => section.evidenceIds)),
       semanticaReportId: report.id,
@@ -72,7 +77,6 @@ function reportPage(input: SemanticaWikiInput, report: SemanticaWikiReport): Sem
 }
 
 function linkPages(pages: SemanticaWikiPage[], reports: SemanticaWikiReport[], warnings: string[], relations: SemanticaWikiInput['relations']) {
-  const slugs = new Set(pages.map(page => page.slug));
   const byIdentity = new Map<string, string>();
   for (const report of reports) {
     for (const id of [report.id, report.entityId, report.topicId]) {
@@ -82,11 +86,19 @@ function linkPages(pages: SemanticaWikiPage[], reports: SemanticaWikiReport[], w
   for (const [index, report] of reports.entries()) {
     const page = pages[index];
     page.links = dependencyLinks(report.dependsOn, byIdentity, page.slug, warnings);
+    page.body = resolveLinks(page.body, byIdentity);
+    page.sections = page.sections.map(section => ({ ...section, text: resolveLinks(section.text, byIdentity) }));
   }
   linkRelations(pages, relations);
-  for (const page of pages) {
-    if (page.pageType === 'overview') page.links = [...slugs].filter(slug => slug !== page.slug);
-  }
+}
+
+/** Resolve authored page identities consistently in plain and structured reader views. */
+function resolveLinks(text: string, byIdentity: Map<string, string>): string {
+  return text.replace(/\[\[([^|\]]+)(\|[^\]]*)?\]\]/gu,
+    (original, id: string, label: string | undefined) => {
+      const slug = byIdentity.get(id);
+      return slug ? `[[${slug}${label ?? ''}]]` : original;
+    });
 }
 
 function dependencyLinks(ids: string[], byIdentity: Map<string, string>, slug: string, warnings: string[]) {
@@ -138,6 +150,7 @@ export function compileSemanticaWiki(input: SemanticaWikiInput) {
   const pages = reports.map(report => reportPage(input, report));
   for (const conflict of input.conflicts) pages.push({
     slug: `conflict:${conflict.id}`, title: conflict.title, body: conflict.text,
+    sections: [{ text: conflict.text, evidenceIds: conflict.evidenceIds }],
     pageType: 'open-question', links: [], provenanceState: 'ambiguous',
     metadata: { ...metadata(input, conflict.evidenceIds), semanticaConflictId: conflict.id },
   });

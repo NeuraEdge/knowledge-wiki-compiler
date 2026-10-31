@@ -23,7 +23,7 @@ test('compiles stable page IDs, report-only prose, citations and navigation', ()
   assert.equal(concept.body, '## Facts\n\nApproved text.');
   assert.deepEqual(concept.links, ['topic:t1']);
   assert.deepEqual(concept.metadata, { semanticaSnapshotId: 'snapshot', semanticaEntityId: 'e/unsafe', semanticaReportId: 'r1', evidenceIds: ['e1'], sourceIds: ['s1'] });
-  assert.equal(result.pages[0].links.length, 3);
+  assert.equal(result.pages[0].links.length, 0);
   assert.deepEqual(result.categories.map(c => c.id), ['overview', 'topics', 'concepts', 'open-questions']);
   assert.deepEqual(result.warnings, ['Missing wiki page for Semantica dependency: gone']);
   input.reports[1].title = 'Renamed';

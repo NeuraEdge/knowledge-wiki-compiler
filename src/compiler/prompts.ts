@@ -293,6 +293,7 @@ export function buildPagePrompt(
   existingPage: string,
   relatedPages: string,
   linkTargets: readonly string[] = [],
+  options: { requireEvidenceLines?: boolean; includeSourcesSection?: boolean } = {},
 ): string {
   const existingSection = existingPage
     ? `\n\nExisting page to update:\n\n${existingPage}`
@@ -306,12 +307,16 @@ export function buildPagePrompt(
     ...withLangLine(
       'You are a wiki author. Write a clear, well-structured markdown page about the concept named in the "Concept to write about" line after the source material.',
       ...pageGroundingLines(),
-      ...sourcesSectionLines(),
+      ...(options.includeSourcesSection === false ? [] : sourcesSectionLines()),
       "Suggest [[wikilinks]] to related concepts where appropriate.",
       "Write in a neutral, informative tone. Be concise but thorough.",
     ),
     "",
-    ...PAGE_ATTRIBUTION_LINES,
+    ...(options.requireEvidenceLines ? [
+      'Every prose paragraph, list block and table block must end with ^[filename.md:START-END] citations.',
+      'Use only supplied SOURCE filenames and numbered lines supporting the claim. File-only citations are invalid.',
+      'For multi-source claims use ^[a.md:1-5, b.md:10-12]. Do not cite headings or add unsupported claims.',
+    ] : PAGE_ATTRIBUTION_LINES),
     ...inferenceLines(),
     ...systemPolicyLines(),
     ...linkTargetLines(linkTargets),

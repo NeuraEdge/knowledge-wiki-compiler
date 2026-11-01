@@ -27,7 +27,7 @@ it('runs native discovery, semantic planning, grounded writing and final overvie
 
 it('rejects invented references and never publishes unsupported prose', async () => {
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan))
-    .mockResolvedValueOnce('Invented claim. ^[not-supplied.md:1-2]');
+    .mockResolvedValue('Invented claim. ^[not-supplied.md:1-2]');
   await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 32000 })).rejects.toThrow(/citation/i);
 });
 
@@ -40,7 +40,7 @@ it('does not collapse same-title pages with different semantic identities', asyn
 });
 
 it.each(['Claim without a reference.', 'Claim. ^[e0.md:0-1]', 'Claim. ^[e0.md:1-2]', 'Claim. ^[e0.md]'])('rejects unsupported or invalid line citations: %s', async body => {
-  const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValueOnce(body);
+  const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValue(body);
   await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 32000 })).rejects.toThrow(/citation/i);
 });
 

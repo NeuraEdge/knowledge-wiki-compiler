@@ -6,8 +6,9 @@
  */
 import { buildPagePrompt, buildSeedPagePrompt } from './prompts.js';
 import { withRunNoPagesLimit, withRunSystemPolicy } from './prompt-modifiers.js';
-import { hostedCompletion, planHostedWiki } from './hosted-plan.js';
-import { citedSections, numberedEvidence } from './hosted-citations.js';
+import { planHostedWiki } from './hosted-plan.js';
+import { numberedEvidence } from './hosted-citations.js';
+import { writeHostedDocument } from './hosted-document.js';
 import type { HostedCompileInput, HostedEvidence, HostedPagePlan, HostedReport } from './hosted-types.js';
 export type * from './hosted-types.js';
 
@@ -50,18 +51,12 @@ async function writePage(input: HostedCompileInput, page: HostedPagePlan, plans:
   const links = plans.filter(other => page.relatedIds.includes(other.id)).map(other => `[[${other.id}|${other.title}]]`);
   const system = buildPagePrompt(`${page.title}: ${page.summary}`, content, '', '', links,
     { requireEvidenceLines: true, includeSourcesSection: false });
-  const body = await hostedCompletion(input, { stage: 'writing', system, user: `Write the ${page.type} page "${page.title}". Explain findings, patterns and material differences, not a list of disconnected facts.` });
-  const dependsOn = pageLinks(body, new Set(plans.map(plan => plan.id)));
+  const { body, dependsOn, sections } = await writeHostedDocument(input,
+    { stage: 'writing', system, user: `Write the ${page.type} page "${page.title}". Explain findings, patterns and material differences, not a list of disconnected facts.` },
+    { pageId: page.id, aliases, allowed: new Set(evidence.map(item => item.id)), links: new Set(plans.map(plan => plan.id)) });
   const report: HostedReport = { id: page.id, title: page.title, type: page.type,
-    sections: citedSections(body, aliases, new Set(evidence.map(item => item.id))), dependsOn };
+    sections, dependsOn };
   return { report, body };
-}
-
-/** Link metadata records authored semantic references, never the whole page catalog. */
-function pageLinks(body: string, allowedLinks: Set<string>): string[] {
-  const links = [...body.matchAll(/\[\[([^|\]]+)(?:\|[^\]]*)?\]\]/gu)].map(match => match[1]);
-  if (links.some(link => !allowedLinks.has(link))) throw new Error('Invalid wiki page link');
-  return [...new Set(links)];
 }
 
 /** Overview is a final synthesis over authored pages with their original evidence aliases. */
@@ -69,10 +64,12 @@ async function writeOverview(input: HostedCompileInput, pages: Array<{ report: H
   const content = pages.map(({ report, body }) => `Page [[${report.id}|${report.title}]]\n${body}`).join('\n\n---\n\n');
   const system = buildSeedPagePrompt({ title: 'Project overview', kind: 'overview', summary: 'Explain what the documents collectively say, their principal themes, material differences and limits.' },
     { minWikilinks: 0, description: 'Synthesize and prioritize across the related pages. Do not concatenate page summaries or repeat definitions. Link to the principal topics and useful concepts.' }, content);
-  const body = await hostedCompletion(input, { stage: 'synthesis', system, user: 'Write one coherent overview. Keep company, period and metric boundaries visible. Cite the underlying evidence, using the same source aliases as the pages.' });
-  const dependsOn = pageLinks(body, new Set(pages.map(page => page.report.id)));
+  const { dependsOn, sections } = await writeHostedDocument(input,
+    { stage: 'synthesis', system, user: 'Write one coherent overview. Keep company, period and metric boundaries visible. Cite the underlying evidence, using the same source aliases as the pages.' },
+    { pageId: 'overview', aliases, allowed: new Set(pages.flatMap(page => page.report.sections.flatMap(section => section.evidenceIds))),
+      links: new Set(pages.map(page => page.report.id)) });
   return { id: 'overview', title: 'Project overview', type: 'overview', dependsOn,
-    sections: citedSections(body, aliases, new Set(pages.flatMap(page => page.report.sections.flatMap(section => section.evidenceIds)))) };
+    sections };
 }
 
 /** Compile under isolated native prompt policies; no environment or storage mutation. */

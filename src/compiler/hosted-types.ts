@@ -26,6 +26,7 @@ export interface HostedPagePlan {
   relatedIds: string[];
 }
 export interface HostedReport {
+  warnings?: string[];
   id: string;
   title: string;
   type: string;
@@ -38,5 +39,5 @@ export interface HostedCompileInput {
   complete(request: { system: string; user: string; stage: string }): Promise<string>;
   retrieve(request: { query: string; sourceIds: string[]; limit: number }): Promise<HostedEvidence[]>;
   onProgress?(stage: string, detail: string): void;
-  checkpoint?<T>(binding: string, produce: () => Promise<T>): Promise<T>;
+  checkpoint?<T>(binding: string, produce: () => Promise<T>, stage?: 'document'): Promise<T>;
 }

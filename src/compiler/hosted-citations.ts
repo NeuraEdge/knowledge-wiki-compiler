@@ -58,26 +58,33 @@ export function references(text: string, aliases: Map<string, HostedEvidence>, a
   return [...new Set(ids)];
 }
 
-/** Every authored content block retains its own evidence; citations never float across sections. */
-export function citedSections(body: string, aliases: Map<string, HostedEvidence>, allowed: Set<string>, editorial = new Set<number>()): HostedReport['sections'] {
+/** Retain authored blocks with explicit citation warnings; table-only footers belong to that table. */
+export function citedSections(body: string, aliases: Map<string, HostedEvidence>, allowed: Set<string>, editorial = new Set<number>(), warnings: string[] = []): HostedReport['sections'] {
   body = normalizeHostedCitations(body);
   const sections: HostedReport['sections'] = [];
   const missing: Array<Array<string | number>> = [];
   const lines = body.split('\n');
   let title = '';
-  for (const token of markdown.parse(body, {})) {
+  const tokens = markdown.parse(body, {}).filter(token => token.level === 0 && token.map);
+  const consumed = new Set<number>();
+  for (const [index, token] of tokens.entries()) {
     if (token.level !== 0 || !token.map || token.type === 'hr') continue;
-    const block = lines.slice(...token.map).join('\n').trim();
+    if (consumed.has(index)) continue;
+    let block = lines.slice(...token.map!).join('\n').trim();
+    const next = tokens[index + 1];
+    const footer = next?.type === 'paragraph_open' ? lines.slice(...next.map!).join('\n').trim() : '';
+    if (token.type === 'table_open' && /^(?:Sources?[:：]?[\t ]*)?(?:\^\[[^\]]+\][\s,;]*)+$/iu.test(footer)) {
+      block += `\n\n${footer}`; consumed.add(index + 1);
+    }
     if (token.type === 'heading_open') { title = block.replace(/^#{1,6}\s+|\s+#+$/gu, '').split('\n')[0]; continue; }
     if (/^(?:[-*]\s*)?\[\[[^\]]+\]\](?:\s*[-*]?\s*\[\[[^\]]+\]\])*$/u.test(block.trim())) continue;
     const evidenceIds = references(block, aliases, allowed);
-    if (!evidenceIds.length && !editorial.has(token.map[0] + 1)) { missing.push(['body', token.map[0] + 1]); continue; }
+    if (!evidenceIds.length && !editorial.has(token.map[0] + 1)) missing.push(['body', token.map[0] + 1]);
     sections.push({ ...(title ? { title } : {}), text: block.replace(/\s*\^\[[^\]]+\]/gu, '').trim(), evidenceIds });
     title = '';
   }
-  if (missing.length) throw new HostedDocumentError(
-    `Wiki content blocks have no evidence citation at body lines ${missing.map(location => location[1]).join(', ')}`, missing[0], 'document', missing);
-  if (!sections.some(section => section.evidenceIds.length)) throw new HostedDocumentError('Wiki page has no cited content', ['body']);
+  if (missing.length) warnings.push(`Some content has no source citation (body lines ${missing.map(location => location[1]).join(', ')}). Check it against the original materials before relying on it.`);
+  if (!sections.some(section => section.evidenceIds.length)) warnings.push('This page has no source citations and needs review.');
   return sections;
 }
 

@@ -40,7 +40,7 @@ it('does not collapse same-title pages with different semantic identities', asyn
   expect(result.reports.map(report => report.id)).toEqual(['overview', 'organization', 'framework']);
 });
 
-it.each(['Claim without a reference.', 'Claim. ^[e0.md:0-1]', 'Claim. ^[e0.md:1-2]', 'Claim. ^[e0.md]'])('rejects unsupported or invalid line citations: %s', async body => {
+it.each(['Claim. ^[e0.md:0-1]', 'Claim. ^[e0.md:1-2]', 'Claim. ^[e0.md]'])('rejects unsupported or invalid line citations: %s', async body => {
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValue(body);
   await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => evidence })).rejects.toThrow(/citat|cited support/i);
 });

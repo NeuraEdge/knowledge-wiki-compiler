@@ -67,11 +67,11 @@ async function writePage(input: HostedCompileInput, page: HostedPagePlan, plans:
   const links = plans.filter(other => page.relatedIds.includes(other.id)).map(other => `[[${other.id}|${other.title}]]`);
   const system = buildPagePrompt(`${page.title}: ${page.summary}`, content, '', '', links,
     { requireEvidenceLines: true, includeSourcesSection: false });
-  const { body, dependsOn, sections } = await writeHostedDocument(input,
+  const { body, dependsOn, sections, warnings } = await checkpointDocument(input,
     { stage: 'writing', system, user: writingUser(page.type, page.title) },
     { subject: `${page.title}: ${page.summary}`, pageId: page.id, aliases, allowed: new Set(evidence.map(item => item.id)), links: new Set(plans.map(plan => plan.id)) });
   const report: HostedReport = { id: page.id, title: page.title, type: page.type,
-    sections, dependsOn };
+    sections, dependsOn, warnings };
   return { report, body };
 }
 
@@ -79,12 +79,12 @@ async function writePage(input: HostedCompileInput, page: HostedPagePlan, plans:
 async function writeOverview(input: HostedCompileInput, pages: Array<{ report: HostedReport; body: string }>, aliases: Map<string, HostedEvidence>): Promise<HostedReport> {
   const content = pages.map(({ report, body }) => `Page [[${report.id}|${report.title}]]\n${body}`).join('\n\n---\n\n');
   const system = buildSeedPagePrompt(overviewSubject, overviewOptions, content);
-  const { dependsOn, sections } = await writeHostedDocument(input,
+  const { dependsOn, sections, warnings } = await checkpointDocument(input,
     { stage: 'synthesis', system, user: overviewUser },
     { subject: 'Project overview: synthesize the supplied pages', pageId: 'overview', aliases, allowed: new Set(pages.flatMap(page => page.report.sections.flatMap(section => section.evidenceIds))),
       links: new Set(pages.map(page => page.report.id)) });
   return { id: 'overview', title: 'Project overview', type: 'overview', dependsOn,
-    sections };
+    sections, warnings };
 }
 
 /** Compile under isolated native prompt policies; no environment or storage mutation. */
@@ -101,4 +101,15 @@ export async function compileHostedWiki(input: HostedCompileInput) {
     const overview = await writeOverview(input, pages, aliases);
     return { recipe: HOSTED_WIKI_RECIPE, reports: [overview, ...pages.map(page => page.report)], evidence: [...aliases.values()] };
   }));
+}
+
+/** Restore a completed page only with the same prompts, evidence, links and validation policy. */
+async function checkpointDocument(input: HostedCompileInput, request: Parameters<HostedCompileInput['complete']>[0],
+  context: Parameters<typeof writeHostedDocument>[2]) {
+  const produce = () => writeHostedDocument(input, request, context);
+  if (!input.checkpoint) return produce();
+  const binding = JSON.stringify({ request, subject: context.subject, pageId: context.pageId,
+    evidence: [...context.aliases], allowed: [...context.allowed], links: [...context.links],
+    policy: 'Preserve quality warnings; reject invalid evidence identity, line bounds and page links.' });
+  return input.checkpoint(binding, produce, 'document');
 }

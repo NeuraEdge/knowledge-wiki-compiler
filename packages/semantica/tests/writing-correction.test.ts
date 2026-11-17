@@ -10,29 +10,14 @@ function completion() {
   return vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan));
 }
 
-it('corrects writing and synthesis under the original evidence contract', async () => {
-  const complete = completion().mockResolvedValueOnce('Unsupported draft.\n\nSupported. ^[e0.md:1]\n\nSee [[topic]].')
-    .mockResolvedValueOnce('Supported. ^[e0.md:1]').mockResolvedValueOnce('Uncited overview.')
-    .mockResolvedValueOnce('Overview. ^[e0.md:1]');
+it('keeps usable writing and marks quality gaps without paid correction loops', async () => {
+  const complete = completion().mockResolvedValueOnce('Unsupported draft.\n\nSupported. ^[e0.md:1]')
+    .mockResolvedValueOnce('Uncited overview.');
   const result = await generateSemanticaWiki({ sources: [source], retrieve: async () => [evidence], complete: withCitationReviews(complete) });
   expect(result.reports).toHaveLength(2);
-  expect(complete).toHaveBeenCalledTimes(6);
-  const correction = JSON.parse(complete.mock.calls[3][0].user);
-  expect(correction.validationError.validationErrors.map((issue: { location: unknown }) => issue.location)).toEqual([['body', 1], ['body', 5]]);
-  expect(correction.instruction).toContain('Navigation-only blocks must use bare');
-  expect(correction.instruction).toContain('Omit unsupported topics');
-  expect(complete.mock.calls[3][0].system).toContain(complete.mock.calls[2][0].system);
-  expect(complete.mock.calls[3][0].system).toContain('CORRECTION REQUIRED:');
-  expect(complete.mock.calls[3][0].system).toContain('Do not retain or paraphrase an unsupported factual introduction');
-  expect(correction.rejectedResponseLines).toContain('5 | See [[topic]].');
-});
-
-it('fails closed after one invalid correction with a safe page diagnostic', async () => {
-  const complete = completion().mockResolvedValue('Uncited claim.');
-  await expect(generateSemanticaWiki({ sources: [source], retrieve: async () => [evidence], complete: withCitationReviews(complete) }))
-    .rejects.toMatchObject({ providerCode: 'WIKI_DOCUMENT_INVALID', diagnostic: {
-      code: 'topic', validationErrorCount: 1, validationErrors: [{ location: ['body', 1], type: 'wiki_document_invalid' }],
-    } });
+  expect(result.reports[1].sections[0].text).toBe('Unsupported draft.');
+  expect(result.reports[1].warnings?.join()).toContain('no source citation');
+  expect(result.reports[0].warnings?.join()).toContain('no source citations');
   expect(complete).toHaveBeenCalledTimes(4);
 });
 

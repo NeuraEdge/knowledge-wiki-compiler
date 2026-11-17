@@ -29,34 +29,27 @@ it('accepts headings adjacent to paragraphs and thematic separators', () => {
   ]);
 });
 
-it('rejects an uncited paragraph even beside a cited paragraph without a blank line', () => {
-  expect(() => citedSections('Uncited.\n\nSupported. ^[e0.md:1]', aliases, allowed)).toThrow(/citation/);
+it('preserves uncited prose with warnings without assigning neighboring evidence', () => {
+  const warnings: string[] = [];
+  const sections = citedSections('Uncited.\n\nSupported. ^[e0.md:1]', aliases, allowed, new Set(), warnings);
+  expect(sections.map(section => section.evidenceIds)).toEqual([[], ['e']]);
+  expect(warnings.join()).toContain('body lines 1');
 });
 
-it('reports every uncited block so one correction can address the complete page', () => {
-  try {
-    citedSections('Private uncited introduction.\n\nSupported. ^[e0.md:1]\n\nPrivate uncited navigation.', aliases, allowed);
-  } catch (error) {
-    expect(error).toBeInstanceOf(HostedDocumentError);
-    expect((error as HostedDocumentError).diagnostic.validationErrors.map(item => item.location)).toEqual([['body', 1], ['body', 5]]);
-    expect((error as Error).message).toContain('1, 5');
-    expect((error as Error).message).not.toContain('Private');
-    return;
-  }
-  throw new Error('Expected all missing citations to be rejected');
+it('reports all citation gaps without leaking document content into diagnostics', () => {
+  const warnings: string[] = [];
+  const sections = citedSections('Private uncited introduction.\n\nSupported. ^[e0.md:1]\n\nPrivate uncited navigation.', aliases, allowed, new Set(), warnings);
+  expect(sections).toHaveLength(3);
+  expect(warnings.join()).toContain('1, 5');
+  expect(warnings.join()).not.toContain('Private');
 });
 
 it('never treats citation examples inside code as evidence attribution', () => {
-  expect(() => citedSections('```\nInvented. ^[e0.md:1]\n```', aliases, allowed)).toThrow(/citation/);
+  const warnings: string[] = [];
+  expect(citedSections('```\nInvented. ^[e0.md:1]\n```', aliases, allowed, new Set(), warnings)[0].evidenceIds).toEqual([]);
+  expect(warnings.join()).toContain('no source citations');
 });
 
-it('exposes a stable error code for the host without leaking document content', () => {
-  try { citedSections('Private uncited material.', aliases, allowed); }
-  catch (error) {
-    expect(error).toBeInstanceOf(HostedDocumentError);
-    expect((error as HostedDocumentError).providerCode).toBe('WIKI_DOCUMENT_INVALID');
-    expect(JSON.stringify((error as HostedDocumentError).diagnostic)).not.toContain('Private');
-    return;
-  }
-  throw new Error('Expected a document validation error');
+it('keeps invalid evidence identities as typed blocking errors', () => {
+  expect(() => citedSections('Private ^[e99.md:1]', aliases, allowed)).toThrow(HostedDocumentError);
 });

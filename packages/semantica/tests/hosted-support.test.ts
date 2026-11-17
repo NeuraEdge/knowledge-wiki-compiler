@@ -68,24 +68,17 @@ it('does not reject purely editorial organization just because it has a valid ci
   expect(await reviewHostedSupport(input, 'This page is organized by metric. ^[e0.md:1]', context)).toEqual(new Set([1]));
 });
 
-it('passes each failed support reason to the single correction, not just line numbers', async () => {
+it('retains support review concerns as warnings instead of rewriting paid content', async () => {
   const { writeHostedDocument } = await import('../../../src/compiler/hosted-document.js');
-  const complete = vi.fn()
-    .mockResolvedValueOnce('Energy and water use fell. ^[e0.md:1]')
+  const complete = vi.fn().mockResolvedValueOnce('Energy and water use fell. ^[e0.md:1]')
     .mockResolvedValueOnce(JSON.stringify({ onTopic: true, reason: 'On subject', blocks: [
       { line: 1, score: 1, editorial: false, reason: 'The cited line supports energy only, not water.' },
-    ] }))
-    .mockResolvedValueOnce('Energy use fell. ^[e0.md:1]')
-    .mockResolvedValueOnce(JSON.stringify({ onTopic: true, reason: 'On subject', blocks: [
-      { line: 1, score: 2, editorial: false, reason: 'Fully supported' },
     ] }));
-  await writeHostedDocument({ ...fixture([]), complete }, { system: 'Author a page', user: 'Energy', stage: 'writing' },
+  const result = await writeHostedDocument({ ...fixture([]), complete }, { system: 'Author a page', user: 'Energy', stage: 'writing' },
     { ...context, pageId: 'energy', links: new Set() });
-  const correction = JSON.parse(complete.mock.calls[2][0].user);
-  expect(correction.validationError.validationErrors).toEqual([
-    { location: ['body', 1], type: 'wiki_document_invalid', reason: 'The cited line supports energy only, not water.' },
-  ]);
-  expect(complete).toHaveBeenCalledTimes(4);
+  expect(result.sections[0].text).toBe('Energy and water use fell.');
+  expect(result.warnings.join()).toContain('energy only, not water');
+  expect(complete).toHaveBeenCalledTimes(2);
 });
 
 it('reuses accepted unchanged blocks during correction and still reviews changed evidence', async () => {

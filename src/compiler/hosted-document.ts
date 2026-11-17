@@ -17,8 +17,16 @@ async function validate(input: HostedCompileInput, body: string, context: { subj
   if (dependsOn.some(link => !links.has(link))) throw new HostedDocumentError('Invalid wiki page link', ['links']);
   // Resolve identities and line bounds before spending a review call.
   references(body, aliases, allowed);
-  const editorial = await reviewHostedSupport(input, body, context);
-  return { body, dependsOn, sections: citedSections(body, aliases, allowed, editorial) };
+  const warnings: string[] = [];
+  let editorial = new Set<number>();
+  try { editorial = await reviewHostedSupport(input, body, context); }
+  catch (error) {
+    input.signal?.throwIfAborted();
+    if (!(error instanceof HostedDocumentError)) throw error;
+    warnings.push(`Content review needs attention: ${error.message}`, ...error.diagnostic.validationErrors.flatMap(issue => issue.reason ? [issue.reason] : []));
+  }
+  const sections = citedSections(body, aliases, allowed, editorial, warnings);
+  return { body, dependsOn, sections, warnings }; 
 }
 
 /** Invalid output is never repaired by attaching arbitrary evidence or dropping claims. */

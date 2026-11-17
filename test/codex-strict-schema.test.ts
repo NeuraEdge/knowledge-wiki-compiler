@@ -39,7 +39,7 @@ const PRODUCTION_TOOLS: Record<string, Schema> = {
   "src/commands/page-selection.ts": PAGE_SELECTION_TOOL.input_schema,
   "src/compiler/prompts.ts": CONCEPT_EXTRACTION_TOOL.input_schema,
   "src/compiler/rule-prompts.ts": RULE_EXTRACTION_TOOL.input_schema,
-  "src/eval/citation-support.ts": JUDGE_TOOL.input_schema,
+  "src/eval/citation-judgement.ts": JUDGE_TOOL.input_schema,
 };
 
 /** Source modules that declare a tool schema literal (`input_schema: {`). */

@@ -1,5 +1,6 @@
 /** Hosted compilation must discover semantic pages, retrieve evidence, then synthesize. */
 import { expect, it, vi } from 'vitest';
+import { withCitationReviews } from './support-fixture.js';
 import { generateSemanticaWiki } from '../src/generation.js';
 import { CONCEPT_EXTRACTION_TOOL } from '../../../src/compiler/prompts.js';
 
@@ -12,7 +13,7 @@ it('runs native discovery, semantic planning, grounded writing and final overvie
     .mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValueOnce('## Findings\n\nEnergy use fell. ^[e0.md:1-1]')
     .mockResolvedValueOnce('## Overview\n\nReports describe energy management. ^[e0.md:1-1]\n\n[[energy|Energy management]]');
   const retrieve = vi.fn(async () => evidence);
-  const result = await generateSemanticaWiki({ sources, complete, retrieve, maxInputChars: 32000 });
+  const result = await generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve });
   expect(complete).toHaveBeenCalledTimes(4);
   expect(complete.mock.calls[0][0].user).toContain(JSON.stringify(CONCEPT_EXTRACTION_TOOL.input_schema));
   expect(retrieve).toHaveBeenCalledWith(expect.objectContaining({ query: 'energy management', sourceIds: ['a'] }));
@@ -28,34 +29,34 @@ it('runs native discovery, semantic planning, grounded writing and final overvie
 it('rejects invented references and never publishes unsupported prose', async () => {
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan))
     .mockResolvedValue('Invented claim. ^[not-supplied.md:1-2]');
-  await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 32000 })).rejects.toThrow(/citation/i);
+  await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => evidence })).rejects.toThrow(/citat|cited support/i);
 });
 
 it('does not collapse same-title pages with different semantic identities', async () => {
   const pages = ['organization', 'framework'].map(id => ({ ...plan.pages[0], id, title: 'Same name' }));
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify({ pages }))
     .mockResolvedValue('Supported. ^[e0.md:1-1]');
-  const result = await generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 32000 });
+  const result = await generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => evidence });
   expect(result.reports.map(report => report.id)).toEqual(['overview', 'organization', 'framework']);
 });
 
 it.each(['Claim without a reference.', 'Claim. ^[e0.md:0-1]', 'Claim. ^[e0.md:1-2]', 'Claim. ^[e0.md]'])('rejects unsupported or invalid line citations: %s', async body => {
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValue(body);
-  await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 32000 })).rejects.toThrow(/citation/i);
+  await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => evidence })).rejects.toThrow(/citat|cited support/i);
 });
 
 it('refuses unauthorized contributors before retrieval or writing', async () => {
   const invalid = { pages: [{ ...plan.pages[0], sourceIds: ['other'] }] };
   const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValue(JSON.stringify(invalid));
   const retrieve = vi.fn();
-  await expect(generateSemanticaWiki({ sources, complete, retrieve, maxInputChars: 32000 })).rejects.toThrow(/scope/i);
+  await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve })).rejects.toThrow(/scope/i);
   expect(retrieve).not.toHaveBeenCalled();
 });
 
 it('rejects missing contributor evidence and wrong-source retrieval results', async () => {
   for (const found of [[], [{ ...evidence[0], sourceId: 'other' }]]) {
     const complete = vi.fn().mockResolvedValueOnce('{"concepts":[]}').mockResolvedValueOnce(JSON.stringify(plan));
-    await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => found, maxInputChars: 32000 })).rejects.toThrow(/evidence/i);
+    await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => found })).rejects.toThrow(/evidence/i);
     expect(complete).toHaveBeenCalledTimes(2);
   }
 });
@@ -63,13 +64,16 @@ it('rejects missing contributor evidence and wrong-source retrieval results', as
 it('cancels after a model call without starting another paid call', async () => {
   const controller = new AbortController();
   const complete = vi.fn(async () => { controller.abort(); return '{"concepts":[]}'; });
-  await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence,
-    maxInputChars: 32000, signal: controller.signal })).rejects.toThrow();
+  await expect(generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => evidence,
+    signal: controller.signal })).rejects.toThrow();
   expect(complete).toHaveBeenCalledTimes(1);
 });
 
-it('rejects oversized planning before sending it to the provider', async () => {
-  const complete = vi.fn().mockResolvedValue(JSON.stringify({ concepts: [{ concept: 'Energy', summary: 'x'.repeat(15000), is_new: true }] }));
-  await expect(generateSemanticaWiki({ sources, complete, retrieve: async () => evidence, maxInputChars: 12000 })).rejects.toThrow(/budget/i);
-  expect(complete).toHaveBeenCalledTimes(1);
+it('passes large evidence and planning through without a local context budget', async () => {
+  const quote = 'Energy use fell. ' + 'x'.repeat(100000);
+  const complete = vi.fn().mockResolvedValueOnce(JSON.stringify({ concepts: [{ concept: 'Energy', summary: 'x'.repeat(15000), is_new: true }] }))
+    .mockResolvedValueOnce(JSON.stringify(plan)).mockResolvedValue('Energy use fell. ^[e0.md:1-1]');
+  const result = await generateSemanticaWiki({ sources, complete: withCitationReviews(complete), retrieve: async () => [{ ...evidence[0], quote }] });
+  expect(result.reports.map(report => report.id)).toEqual(['overview', 'energy']);
+  expect(complete.mock.calls[2][0].system).toContain(quote);
 });

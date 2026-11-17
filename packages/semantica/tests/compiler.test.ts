@@ -5,7 +5,7 @@ import { compileSemanticaWiki, type SemanticaWikiInput } from '../src/index.js';
 
 function fixture(): SemanticaWikiInput {
   return {
-    snapshotId: 'snapshot', inputRevision: 'revision',
+    generation: 'generation', inputRevision: 'revision',
     evidence: [{ id: 'e1', sourceId: 's1' }],
     reports: [
       { id: 'r0', type: 'overview', title: 'Overview', sections: [{ text: 'Approved overview.', evidenceIds: ['e1'] }], dependsOn: [] },
@@ -22,7 +22,7 @@ test('compiles stable page IDs, report-only prose, citations and navigation', ()
   const concept = result.pages.find(p => p.slug === 'concept:e/unsafe')!;
   assert.equal(concept.body, '## Facts\n\nApproved text.');
   assert.deepEqual(concept.links, ['topic:t1']);
-  assert.deepEqual(concept.metadata, { semanticaSnapshotId: 'snapshot', semanticaEntityId: 'e/unsafe', semanticaReportId: 'r1', evidenceIds: ['e1'], sourceIds: ['s1'] });
+  assert.deepEqual(concept.metadata, { semanticaGeneration: 'generation', semanticaEntityId: 'e/unsafe', semanticaReportId: 'r1', evidenceIds: ['e1'], sourceIds: ['s1'] });
   assert.equal(result.pages[0].links.length, 0);
   assert.deepEqual(result.categories.map(c => c.id), ['overview', 'topics', 'concepts', 'open-questions']);
   assert.deepEqual(result.warnings, ['Missing wiki page for Semantica dependency: gone']);

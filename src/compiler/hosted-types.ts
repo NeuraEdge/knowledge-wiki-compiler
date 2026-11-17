@@ -6,8 +6,10 @@
 export interface HostedSource {
   id: string;
   title: string;
-  passages: Array<{ text: string; sectionPath: string[] }>;
+  revision?: string;
+  passages: AsyncIterable<HostedPassage> | Iterable<HostedPassage>;
 }
+export interface HostedPassage { text: string; sectionPath: string[] }
 export interface HostedEvidence {
   id: string;
   sourceId: string;
@@ -32,9 +34,9 @@ export interface HostedReport {
 }
 export interface HostedCompileInput {
   sources: HostedSource[];
-  maxInputChars: number;
   signal?: AbortSignal;
   complete(request: { system: string; user: string; stage: string }): Promise<string>;
   retrieve(request: { query: string; sourceIds: string[]; limit: number }): Promise<HostedEvidence[]>;
   onProgress?(stage: string, detail: string): void;
+  checkpoint?<T>(binding: string, produce: () => Promise<T>): Promise<T>;
 }

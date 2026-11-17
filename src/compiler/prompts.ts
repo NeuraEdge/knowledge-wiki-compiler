@@ -315,6 +315,7 @@ export function buildPagePrompt(
     ...(options.requireEvidenceLines ? [
       'Every prose paragraph, list block and table block must end with ^[filename.md:START-END] citations.',
       'Use only supplied SOURCE filenames and numbered lines supporting the claim. File-only citations are invalid.',
+      'START and END are the 1-based local quote line numbers before | in that SOURCE, never document character offsets, page numbers or source IDs. Stay within its Valid citation lines.',
       'For multi-source claims use ^[a.md:1-5, b.md:10-12]. Do not cite headings or add unsupported claims.',
     ] : PAGE_ATTRIBUTION_LINES),
     ...inferenceLines(),

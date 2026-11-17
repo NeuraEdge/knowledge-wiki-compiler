@@ -3,7 +3,7 @@
  * Hosted generation uses native compiler prompts and caller-owned model/retrieval
  * execution. Canonical facts and evidence remain Semantica-owned.
  */
-export { generateSemanticaWiki, HOSTED_WIKI_RECIPE } from './generation.js';
+export { generateSemanticaWiki, HOSTED_WIKI_RECIPE, hostedWikiContract } from './generation.js';
 export type * from './generation.js';
 
 export interface SemanticaWikiReport {
@@ -17,7 +17,7 @@ export interface SemanticaWikiReport {
 }
 
 export interface SemanticaWikiInput {
-  snapshotId: string;
+  generation: string;
   inputRevision: string;
   reports: SemanticaWikiReport[];
   evidence: Array<{ id: string; sourceId: string }>;
@@ -26,7 +26,7 @@ export interface SemanticaWikiInput {
 }
 
 export interface SemanticaWikiMetadata {
-  semanticaSnapshotId: string;
+  semanticaGeneration: string;
   semanticaEntityId?: string;
   semanticaTopicId?: string;
   semanticaReportId?: string;
@@ -59,7 +59,7 @@ function metadata(input: SemanticaWikiInput, evidenceIds: string[]): SemanticaWi
   for (const id of unique) {
     if (!byId.get(id)) throw new Error(`Missing Semantica evidence: ${id}`);
   }
-  return { semanticaSnapshotId: input.snapshotId, evidenceIds: unique,
+  return { semanticaGeneration: input.generation, evidenceIds: unique,
     sourceIds: [...new Set(unique.map(id => byId.get(id)!))] };
 }
 
@@ -144,7 +144,7 @@ function navigation(pages: SemanticaWikiPage[]) {
 
 /** Render only supplied report text; missing facts never trigger extraction. */
 export function compileSemanticaWiki(input: SemanticaWikiInput) {
-  if (!input.snapshotId.trim() || !input.inputRevision.trim()) throw new Error('Semantica snapshot identity is required');
+  if (!input.generation.trim() || !input.inputRevision.trim()) throw new Error('Semantica publication identity is required');
   if (new Set(input.evidence.map(e => e.id)).size !== input.evidence.length) throw new Error('Duplicate Semantica evidence');
   const reports = input.reports.filter(report => report.sections.length);
   const pages = reports.map(report => reportPage(input, report));

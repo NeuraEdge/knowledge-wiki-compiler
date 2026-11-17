@@ -2,9 +2,9 @@
 
 `@neuraedge/knowledge-wiki-compiler-semantica` is the dependency-free Semantica
 entry of NeuraEdge/knowledge-wiki-compiler. It is distributed separately so
-snapshot-only hosts do not install the raw-source extraction providers.
+publication-only hosts do not install the raw-source extraction providers.
 
-`compileSemanticaWiki` consumes reports and conflicts from one adopted snapshot,
+`compileSemanticaWiki` consumes reports and conflicts from one adopted native publication,
 with canonical evidence/source IDs. It produces report Markdown bodies, stable
 page slugs, related-page links, categories and a reading outline. It never
 parses files, merges entities, infers relations or calls a model. The host
